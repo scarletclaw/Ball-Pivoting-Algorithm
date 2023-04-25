@@ -175,6 +175,8 @@ class BPA:
                                                        color='green')
                     else:
                         i += 1
+        while 1:
+            self.visualizer.lock()
 
     def find_seed_triangle(self, first_point_index=0, num_recursion_calls=0) -> (int, Tuple):
         """
