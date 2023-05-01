@@ -7,6 +7,7 @@ from point import Point
 from edge import Edge
 from visualizer import Visualizer
 import utils
+import sys
 
 INFINITY = np.inf
 
@@ -16,7 +17,8 @@ class BPA:
         self.num_points_i_tried_to_seed_from = 0
         self.points = self.read_points(path)
         self.radius = radius
-        self.grid = Grid(points=self.points, radius=radius)
+        self.current_radius = 0
+        self.grid = Grid(points=self.points, radius=radius[-1])
         self.num_free_points = len(self.points)
         self.visualizer = None
         self.num_workers = num_workers
@@ -147,7 +149,14 @@ class BPA:
                 first_point_index = last_point_index
 
                 if edges is None or edges is -1:
-                    return
+                    print(f"current radius: {self.current_radius}")
+                    print("cannot find new seed triangle!!!!")
+                    self.current_radius += 1
+                    if(self.current_radius >= len(self.radius)):
+                        self.visualizer.lock()
+
+                    print("srart next search")
+                    continue
 
                 if self.visualizer is not None:
                     self.visualizer.update(edges=self.grid.edges, grid_triangles=self.grid.triangles, color='red')
@@ -157,13 +166,45 @@ class BPA:
                 i = 0
 
                 # Try to expand from each edge.
-                while i < len(edges) and tried_to_expand_counter < limit_iterations:
-                    e1, e2 = self.expand_triangle(edges[i], edges)
+                # while i < len(edges) and tried_to_expand_counter < limit_iterations:
+                #     print(len(edges))
+                #     e1, e2 = self.expand_triangle(edges[i], edges)
+                #     tried_to_expand_counter += 1
+                #     pbar.update(1)
+
+                #     if e1 is not None and e2 is not None:
+                #         edges = [e1, e2]
+                #         i = 0
+
+                #         if self.visualizer is not None:
+                #             if tried_to_expand_counter >= limit_iterations:
+                #                 self.visualizer.update(edges=self.grid.edges, grid_triangles=self.grid.triangles,
+                #                                        color='blue')
+                #             else:
+                #                 self.visualizer.update(edges=self.grid.edges, grid_triangles=self.grid.triangles,
+                #                                        color='green')
+                #     else:
+                #         i += 1
+                # use queue
+                edges_queue = []
+                triangle_edges_queue = []
+                for edge in edges:
+                    edges_queue.append(edge)
+                    triangle_edges_queue.append(edges)
+                while len(edges_queue) > 0:
+                    e1, e2 = self.expand_triangle(edges_queue[0], triangle_edges_queue[0])
+                    edges_queue.pop(0)
+                    triangle_edges_queue.pop(0)
+
                     tried_to_expand_counter += 1
                     pbar.update(1)
 
                     if e1 is not None and e2 is not None:
                         edges = [e1, e2]
+                        edges_queue.append(e1)
+                        edges_queue.append(e2)
+                        triangle_edges_queue.append(edges)
+                        triangle_edges_queue.append(edges)
                         i = 0
 
                         if self.visualizer is not None:
@@ -189,6 +230,7 @@ class BPA:
         """
         if num_recursion_calls > len(self.points):
             print("i was here")
+            print(f"{num_recursion_calls}, {len(self.points)}")
             return -1, -1, -1
 
         # Find a free point.
@@ -215,6 +257,7 @@ class BPA:
         # For better performance. If we couldn't find a close point to expand to, it's better just to find new
         # seed than getting a far point.
         LIMIT_POINTS = 6
+        # LIMIT_POINTS = 20
         p1_neighbor_points = p1_neighbor_points[:LIMIT_POINTS]
 
         # For each other point, find all points that are in 2r distance from that other point.
@@ -241,7 +284,8 @@ class BPA:
 
             # For better performance. If we couldn't find a close point to expand to, it's better just to find new
             # seed than getting a far point.
-            LIMIT_POINTS = 5
+            # LIMIT_POINTS = 6
+            LIMIT_POINTS = 6
             possible_points = possible_points[:LIMIT_POINTS]
 
             for i, p3 in enumerate(possible_points):
@@ -255,7 +299,7 @@ class BPA:
 
                 # For each three points we got, check if a sphere with a radius of r cant be fitted inside the
                 # triangle.
-                if self.radius <= utils.calc_incircle_radius(p1, p2, p3):
+                if self.radius[self.current_radius] <= utils.calc_incircle_radius(p1, p2, p3):
                     # Calculate triangle's normal.
                     v1 = [p2.x - p1.x, p2.y - p1.y, p2.z - p1.z]
                     v2 = [p3.x - p1.x, p3.y - p1.y, p3.z - p1.z]
@@ -362,7 +406,7 @@ class BPA:
 
             # For better performance. If we couldn't find a close point to expand to, it's better just to find new
             # seed than getting a far point.
-            LIMIT_POINTS = 5
+            LIMIT_POINTS = 7
             sorted_possible_points = sorted_possible_points[:LIMIT_POINTS]
 
             for index, p3 in enumerate(sorted_possible_points):
@@ -375,7 +419,7 @@ class BPA:
                 # If a sphere's radius is smaller than the radius of the incircle of a triangle, the sphere can fit into
                 # the triangle.
                 t = utils.calc_incircle_radius(p1, p2, p3)
-                if self.radius <= utils.calc_incircle_radius(p1, p2, p3):
+                if self.radius[self.current_radius] <= utils.calc_incircle_radius(p1, p2, p3):
                     # Calculate new triangle's normal.
                     v1 = [p2.x - p1.x, p2.y - p1.y, p2.z - p1.z]
                     v2 = [p3.x - p1.x, p3.y - p1.y, p3.z - p1.z]

@@ -38,6 +38,8 @@ class Grid:
         # Calculate each cell edge size.
         self.num_cells_per_axis = self.bounding_box_size / (2 * self.radius)
         self.cell_size = self.bounding_box_size / self.num_cells_per_axis
+        
+        self.cell_size = 1
 
         # Start appending the data points to their cells.
         for point in list_of_points:
